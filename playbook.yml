@@ -1,0 +1,27 @@
+- hosts: all
+  become: true
+  become_user: root
+  vars:
+    # Set the Kubernetes version to the latest stable release
+    kubernetes_version: 1.24.5
+
+  tasks:
+    - name: Install Prerequisites
+      script: "./prerequisites.sh"
+      
+    - name: Initialize Kubernetes cluster on master node
+      command: kubeadm init --pod-network-cidr 192.168.0.0/16 --kubernetes-version {{ kubernetes_version }}
+      when: inventory_hostname == "master"
+  
+    - name: Install Calico
+      script: "./networking.sh"
+      when: inventory_hostname == "master"
+      
+    - name: Extract join command
+      shell: kubeadm token create --print-join-command
+      register: join_command
+      when: inventory_hostname == "master"
+
+    - name: Join worker nodes to the cluster
+      shell: "{{ join_command.stdout }}"
+      when: inventory_hostname != "master"
